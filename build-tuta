@@ -86,12 +86,6 @@ if [ ! -e "../tutanota_${BUILDVER}.orig.tar.gz" ]; then
     exit 4
 fi
 
-# Create source file if it does not exist (building from master)
-#echo "Create tutanota_${BUILDVER}.orig.tar.gz" | tee -a ../build.log
-#if [ ! -e ../tutanota_${BUILDVER}.orig.tar.gz ]; then
-#    tar --exclude={.git,build,artifacts} -czvf ../tutanota_${BUILDVER}.orig.tar.gz ./ | tee -a ../build.log
-#fi
-
 # Update sub modules
 git submodule init | tee -a ../build.log
 git submodule sync --recursive | tee -a ../build.log
