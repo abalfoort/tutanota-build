@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Maintenance guide: https://www.debian.org/doc/manuals/maint-guide/
+# Lintian tags: https://lintian.debian.org/tags/
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Packages
+# sudo apt-get install devscripts build-essential lintian wget tar
+
+# Devscripts
+# https://manpages.debian.org/stretch/devscripts/debuild.1.en.html
+# ~/.devscripts
+# DEBUILD_DPKG_BUILDPACKAGE_OPTS="-k0xBCA63C3C"
+# DEBUILD_TGZ_CHECK="no"
+
+# Build command:
+# dch -D stable -u low -M -p
+# debuild -ai386
+
+# Get package information
+source := $(shell dpkg-parsechangelog -S Source)
+
+%:
+	dh $@
+
+override_dh_dwz:
+
+override_dh_builddeb:
+	dh_builddeb
+	# Cleanup build directory when done
+	rm -rf ./debian/$(source)

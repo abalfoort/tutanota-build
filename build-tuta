@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd $SCRIPT_DIR
+
+# Install some packages
+if [ -z "$(dpkg-query -l build-essential 2>/dev/null | grep ^i)" ]; then
+    sudo apt install linux-headers-$(uname -r) build-essential | tee -a build.log
+fi
+if [ -z "$(dpkg-query -l cmake 2>/dev/null | grep ^i)" ]; then
+    sudo apt install cmake | tee -a build.log
+fi
+if [ -z "$(dpkg-query -l git 2>/dev/null | grep ^i)" ]; then
+    sudo apt install git | tee -a build.log
+fi
+if [ -z "$(dpkg-query -l emscripten 2>/dev/null | grep ^i)" ]; then
+    sudo apt install emscripten | tee -a build.log
+fi
+
+# Download and install rust
+# # https://www.rust-lang.org/tools/install
+if [ ! -e "$HOME/.cargo" ] || [ ! -e "$HOME/.rustup" ]; then
+    # https://www.rust-lang.org/tools/install
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh | tee -a build.log
+    \. $HOME/.cargo/env
+fi
+
+# Download and install Node.js
+# https://nodejs.org/en/download
+if [ ! -e "$HOME/.npm" ] || [ ! -e "$HOME/.nvm" ]; then
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash | tee -a build.log
+    \. "$HOME/.nvm/nvm.sh"
+    nvm install 23
+    printf 'node -v should print "23.10.0": '
+    node -v | tee -a build.log
+    printf 'nvm current should print "23.10.0": '
+    nvm current | tee -a build.log
+    printf 'npm -v should print "10.9.2": '
+    npm -v | tee -a build.log
+fi
+
+if [ ! -f "./deb/debian/changelog" ]; then
+    echo "ERROR: Cannot find ./deb/debian/changelog" | tee -a build.log
+    exit 1
+fi
+
+# Get the latest release tag
+RELEASETAG=$(./check -q)
+if [ -z "$RELEASETAG" ]; then
+    echo "ERROR: Cannot retrieve the latest release tag from Github" | tee -a build.log
+    exit 2
+fi
+
+# Building Tutanota (tutanota sub-directory)
+if [ -d tutanota ]; then
+    cd tutanota
+    # Update and checkout latest release tag
+    git checkout master | tee -a ../build.log
+    PULL=$(git pull 2>&1)
+    echo $PULL | tee -a ../build.log
+    [[ "$PULL" == error* ]] && exit 3
+    git checkout $RELEASETAG | tee -a ../build.log
+else
+    # Get the source
+    rm -rf tutanota
+    git clone https://github.com/tutao/tutanota.git | tee -a ../build.log
+    cd tutanota
+
+    # Checkout latest release tag
+    git checkout $RELEASETAG | tee -a ../build.log
+fi
+
+BUILDVER=$(jq -r '.version' ./package.json)
+echo "Build version: $BUILDVER" | tee -a ../build.log
+
+if [[ "$RELEASETAG" != *$BUILDVER ]]; then
+    echo "$BUILDVER not in $RELEASETAG - exiting" | tee -a ../build.log
+    exit 3
+fi
+
+# Get source file
+wget -O "../tutanota_${BUILDVER}.orig.tar.gz" "https://github.com/tutao/tutanota/archive/refs/tags/${RELEASETAG}.tar.gz" | tee -a ../build.log
+
+if [ ! -e "../tutanota_${BUILDVER}.orig.tar.gz" ]; then
+    echo "Could not get ../tutanota_${BUILDVER}.orig.tar.gz - exiting"
+    exit 4
+fi
+
+# Create source file if it does not exist (building from master)
+#echo "Create tutanota_${BUILDVER}.orig.tar.gz" | tee -a ../build.log
+#if [ ! -e ../tutanota_${BUILDVER}.orig.tar.gz ]; then
+#    tar --exclude={.git,build,artifacts} -czvf ../tutanota_${BUILDVER}.orig.tar.gz ./ | tee -a ../build.log
+#fi
+
+# Update sub modules
+git submodule init | tee -a ../build.log
+git submodule sync --recursive | tee -a ../build.log
+git submodule update | tee -a ../build.log
+npm ci | tee -a ../build.log
+
+# Start building
+npm run build-packages | tee -a ../build.log
+node desktop --custom-desktop-release | tee -a ../build.log
+
+if [ ! -d ./artifacts/desktop/linux-unpacked ]; then
+    # https://github.com/tutao/tutanota/tree/master/libs/webassembly
+    echo "ERROR: Build failed" | tee -a ../build.log
+    exit 4
+fi
+
+# From here: build deb package
+# Save version
+sed -i "s/X-Tutanota-Version=.*/X-Tutanota-Version=$BUILDVER/" ../deb/usr/share/applications/tutanota-desktop.desktop
+
+# Packaging (deb sub-directory)
+cd ../deb
+# Copy upstream files
+rm ./debian/upstream/*
+cp -vf ../tutanota/*.txt ./debian/upstream/
+cp -vf ../tutanota/*.md ./debian/upstream/
+cp -vf ../tutanota/artifacts/desktop/linux-unpacked/*.txt ./debian/upstream/
+cp -vf ../tutanota/artifacts/desktop/linux-unpacked/*.html ./debian/upstream/
+rm -f ./debian/docs
+FLS=$(ls ./debian/upstream)
+for F in $FLS; do
+    echo "debian/upstream/$F" >> ./debian/docs
+done
+
+rm -r ./opt
+mkdir -p ./opt/tutanota/
+cp -rvf ../tutanota/artifacts/desktop/linux-unpacked/* ./opt/tutanota/
+mkdir -p ./usr/share/icons/hicolor/64x64/apps
+cp -vf ../tutanota/artifacts/desktop/linux-unpacked/resources/icons/logo-solo-red-small.png ./usr/share/icons/hicolor/64x64/apps/tutanota-desktop.png
+mkdir -p ./usr/share/icons/hicolor/512x512/apps
+cp -vf ../tutanota/artifacts/desktop/linux-unpacked/resources/icons/logo-solo-red.png ./usr/share/icons/hicolor/512x512/apps/tutanota-desktop.png
+
+# Get distribution and version to build
+DIST=$(head -1 "./debian/changelog" | awk -F'[ ;]' '{print $3}')
+CURVER=$(head -1 "./debian/changelog" | awk -F'[(-]' '{print $2}')
+ITERATION="0"
+if [ "$CURVER" == "$BUILDVER" ]; then
+    ITERATION=$(head -1 "./debian/changelog" | awk -F'[-)]' '{print $2}')
+fi
+
+# Edit changelog
+dch --distribution $DIST --newversion "$BUILDVER-$((ITERATION+1))" --urgency low --controlmaint --preserve "Upstream update"
+
+# Build package
+debuild --no-lintian | tee -a ../build.log
+
+cd ..
+
+if [ ! -e tutanota_${BUILDVER}*buildinfo ]; then
+    echo "ERROR: debuild failed" | tee -a build.log
+    exit 5
+fi
+
+mv -f tutanota*${BUILDVER}* ../
+
+if [ -n "$LASTBUILD" ]; then
+    xdg-open build.log
+fi
+
+exit 0

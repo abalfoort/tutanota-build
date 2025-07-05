@@ -1,0 +1,4 @@
+skip-patches
+include-binaries
+include-removal
+diff-ignore = .* 

@@ -1,0 +1,16 @@
+Source: tutanota
+Section: web
+Priority: optional
+Maintainer: Arjen Balfoort <arjenbalfoort@tutamail.com>
+Build-Depends: debhelper-compat (= 12)
+Standards-Version: 4.5.0
+Homepage: https://tuta.com/
+Vcs-Browser: https://github.com/tutao/tutanota
+Vcs-Git: https://github.com/tutao/tutanota.git
+
+Package: tutanota
+Architecture: amd64
+Depends: ${shlibs:Depends}
+Description: Tuta Mail client.
+ Tuta Mail is the secure email service with built-in end-to-end encryption
+ that enables you to communicate securely with anyone on all your devices.

@@ -1,0 +1,6 @@
+dir-or-file-in-opt
+embedded-library
+source-is-missing
+debug-file-with-no-debug-symbols
+initial-upload-closes-no-bugs
+package-has-unnecessary-activation-of-ldconfig-trigger
