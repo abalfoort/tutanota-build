@@ -25,17 +25,30 @@ if [ ! -e "$HOME/.cargo" ] || [ ! -e "$HOME/.rustup" ]; then
     \. $HOME/.cargo/env
 fi
 
-# Download and install Node.js
+# Download and install latest stable Node.js
 # https://nodejs.org/en/download
 if [ ! -e "$HOME/.npm" ] || [ ! -e "$HOME/.nvm" ]; then
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash | tee -a build.log
+    # Download and install nvm:
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash | tee -a build.log
+
+    # Start nvm now
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+    # in lieu of restarting the shell
     \. "$HOME/.nvm/nvm.sh"
-    nvm install 23
-    printf 'node -v should print "23.10.0": '
+
+    # Download and install Node.js:
+    nvm install 24
+
+    printf 'node -v should print "24.7.0": '
     node -v | tee -a build.log
-    printf 'nvm current should print "23.10.0": '
+
+    printf 'nvm current should print "24.7.0": '
     nvm current | tee -a build.log
-    printf 'npm -v should print "10.9.2": '
+
+    printf 'npm -v should print "11.5.1": '
     npm -v | tee -a build.log
 fi
 
