@@ -16,11 +16,13 @@ done
 # curl -s https://api.github.com/repos/tutao/tutanota/releases | jq -r '.[0].tag_name' | grep 'tutanota-release'
 for I in {0..9}; do
     RELEASETAG=$(curl -s https://api.github.com/repos/tutao/tutanota/releases | jq -r ".[$I].tag_name" | grep -E 'tutanota-release|tutanota-desktop-release')
-    if $QUIET; then
-        echo $RELEASETAG
-        exit
+    if [ -n "$RELEASETAG" ]; then
+        if $QUIET; then
+            echo $RELEASETAG
+            exit
+        fi
+        break
     fi
-    [ -n "$RELEASETAG" ] && break
 done
 
 if [ -z "$RELEASETAG" ]; then
