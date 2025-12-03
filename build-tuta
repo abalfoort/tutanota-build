@@ -4,18 +4,11 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 
 # Install some packages
-if [ -z "$(dpkg-query -l build-essential 2>/dev/null | grep ^i)" ]; then
-    sudo apt install linux-headers-$(uname -r) build-essential | tee -a build.log
-fi
-if [ -z "$(dpkg-query -l cmake 2>/dev/null | grep ^i)" ]; then
-    sudo apt install cmake | tee -a build.log
-fi
-if [ -z "$(dpkg-query -l git 2>/dev/null | grep ^i)" ]; then
-    sudo apt install git | tee -a build.log
-fi
-if [ -z "$(dpkg-query -l emscripten 2>/dev/null | grep ^i)" ]; then
-    sudo apt install emscripten | tee -a build.log
-fi
+for P in linux-headers-$(uname -r) build-essential cmake git emscripten; do
+    if [ -z "$(dpkg-query -l $P 2>/dev/null | grep ^i)" ]; then
+        sudo apt install $P | tee -a build.log
+    fi
+done
 
 # Download and install rust
 # # https://www.rust-lang.org/tools/install
