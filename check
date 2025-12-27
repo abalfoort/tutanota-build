@@ -12,6 +12,22 @@ while getopts 'q' OPT; do
   esac
 done
 
+upgrade() {
+    # Normalize version strings
+    old_version=$(echo "$1" | awk -F. '{printf "%03d%03d%03d\n", $1, $2, $3}')
+    new_version=$(echo "$2" | awk -F. '{printf "%03d%03d%03d\n", $1, $2, $3}')
+    #echo "$old_version / $new_version"
+
+    # Use: if upgrade $old_version $new_version; then ... fi
+    if [ "$(echo -e "$old_version\n$new_version" | sort -V | head -n1)" = "$old_version" ]; then
+        # 1 = false
+        return 1
+    else
+        # 0 = true
+        return 0
+    fi
+}
+
 # curl -s https://api.github.com/repos/tutao/tutanota/releases/latest | jq -r '.tag_name' | grep 'tutanota-release'
 # curl -s https://api.github.com/repos/tutao/tutanota/releases | jq -r '.[0].tag_name' | grep 'tutanota-release'
 for I in {0..9}; do
@@ -38,9 +54,10 @@ if [ -d tutanota ]; then
     CURRELEASE=$(git branch | grep -E '^\*' | tr -d '()' | awk '{print $NF}')
 fi
 
-if [ "$CURRELEASE" != "$RELEASETAG" ]; then
+
+if upgrade "${CURRELEASE##*-}" "${RELEASETAG##*-}"; then
     TITLE="Tutanota build new release!"
-    TEXT="<b>Release to build:</b> ${RELEASETAG##*-}"
+    TEXT="Current release: ${CURRELEASE##*-}\n<b>Release to build:</b> ${RELEASETAG##*-}"
     notify-send -u critical -a "$TITLE" -i tutanota-desktop -w "$TITLE" "$TEXT" &
 else
     TITLE="Tutanota build up-to-date"
